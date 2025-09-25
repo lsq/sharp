@@ -177,9 +177,87 @@ jobs:
         if: matrix.package
         with:
           name: ${{ matrix.platform }}
-          path: npm/${{ matrix.platform }}
+          path: |
+            npm/${{ matrix.platform }}
+            src/build
           retention-days: 1
           if-no-files-found: error
+  build-msys2:
+    permissions: 
+     contents: read
+    strategy:
+      matrix:
+        sys: [UCRT64]
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: taiki-e/checkout-action@b13d20b7cda4e2f325ef19895128f7ff735c0b3d # v1.3.1
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.sys }}
+          update: true
+          install: >-
+            base-devel binutils
+          pacboy: >-
+            rustup:p
+            yarn:p
+            python3.12:p
+            toolchain:p
+      - name: Install
+        run: |
+          which cargo
+          which node && node -p "process.report.getReport().header.osName"
+          which rustup && rustup default
+          rustup set default-host x86_64-pc-windows-gnu
+          rustup install stable-x86_64-pc-windows-gnu
+          # rustVersion=$(sed -n 's/channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          # rustup install "$rustVersion"
+          rustup default stable-x86_64-pc-windows-gnu
+          rustup override set stable-x86_64-pc-windows-gnu
+          rustup show
+          rustup target add x86_64-pc-windows-gnu 
+          which npm && which corepack
+          # corepack enable pnpm
+          # npm install -g pnpm
+          # npm install -g pnpm@latest-10
+          # echo $?
+      - name: Build
+        run: |
+          # npm install -g corepack
+          # corepack enable
+          # export JAVA_HOME="/C/Program Files/OpenJDK/jdk-21"
+          # export PATH="$JAVA_HOME/bin:$PATH"
+          # java -version
+          which npm && which python && python --version
+          which node-gyp
+          [ -d /c/hostedtoolcache/windows/Python ] && mv /c/hostedtoolcache/windows/Python{,.bak}
+          # sed -i 's|\(@napi-rs/cli": *\).*,$|\1"https://github.com/lsq/napi-rs/releases/download/%40napi-rs%2Fcli%403.2.0/napi-rs-cli-3.2.0.tgz",|' package.json
+          # sed -i 's|\(@napi-rs/wasm-runtime": *"\).*"|\1https://github.com/lsq/napi-rs/releases/download/%40napi-rs%2Fwasm-runtime%401.0.5/napi-rs-wasm-runtime-1.0.5.tgz"|' package.json 
+          # sed -i '/node-gyp/d' package.json
+          sed -i 's/install":/build":/' package.json
+          # sed -i '/gyp =/d' install/check.js
+          # sed -i 's/gyp()/d' install/check.js
+          mkdir node_modules
+          npm install
+          cp -rf $MINGW_PREFIX/lib/node_modules/npm/node_modules/node-gyp node_modules/
+          # ls node_modules
+          npm run build --build-from-source
+          ls -R ./src/build/
+          ls -R npm/
+          npm run test-unit
+          npm run package-from-local-build
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: win32-x64-gnu
+          path: |
+            npm/win32-x64-gnu
+          if-no-files-found: error
+
+
   build-linuxmusl-arm64:
     permissions:
       contents: read
