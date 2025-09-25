@@ -3,8 +3,7 @@
 
 {
   'variables': {
-    #'vips_version': '<!(which node && node -p "require(\'../lib/libvips\').minimumLibvipsVersion")',
-    'vips_version': '<!(echo $SHELL)',
+    'vips_version': '<!(node -p "require(\'../lib/libvips\').minimumLibvipsVersion")',
     'platform_and_arch': '<!(node -p "require(\'../lib/libvips\').buildPlatformArch()")',
     'sharp_libvips_version': '<!(node -p "require(\'../package.json\').optionalDependencies[\'@img/sharp-libvips-<(platform_and_arch)\']")',
     'sharp_libvips_yarn_locator': '<!(node -p "require(\'../lib/libvips\').yarnLocator()")',
@@ -16,7 +15,7 @@
   'targets': [{
     'target_name': 'libvips-cpp-<(vips_version)',
     'conditions': [
-      ['OS == "msvc"', {
+      ['OS == "win" and target_platform == "msvc"', {
         # Build libvips C++ binding for Windows due to MSVC std library ABI changes
         'type': 'shared_library',
         'defines': [
@@ -82,8 +81,7 @@
         'type': 'none'
       }]
     ]
-  },
-  {
+  }, {
     'target_name': 'sharp-<(platform_and_arch)',
     'defines': [
       'G_DISABLE_ASSERT',
@@ -99,7 +97,7 @@
     ],
     'variables': {
       'conditions': [
-        ['OS != "win" or target_platform =="mingw"', {
+        ['OS != "win"', {
           'pkg_config_path': '<!(node -p "require(\'../lib/libvips\').pkgConfigPath()")',
           'use_global_libvips': '<!(node -p "Boolean(require(\'../lib/libvips\').useGlobalLibvips()).toString()")'
         }, {
@@ -117,24 +115,13 @@
       'utilities.cc',
       'sharp.cc'
     ],
-    'actions': [{
-      'action_name': 'debug_vars',
-      'inputs': [],
-      'outputs': ['<(INTERMEDIATE_DIR)/debug_dummy'],
-      'action': [
-        'python', '-c',
-        'import os;print(os.environ.get(\'SHELL\'));print(\'---------------------------\')'
-      ],
-      'message': '\'OS = <(OS)\'; \'arch = <(platform_and_arch)\'; \'vips_version = <(vips_version)\';\'sharp_libvips_version = <(sharp_libvips_version)\';\'sharp_libvips_yarn_locator = <(sharp_libvips_yarn_locator)\';\'sharp_libvips_include_dir = <(sharp_libvips_include_dir)\';\'sharp_libvips_lib_dir = <(sharp_libvips_lib_dir)\';\'sharp_libvips_cplusplus_dir = <(sharp_libvips_cplusplus_dir)\';pkg_config_path=<(pkg_config_path);use_global_libvips=<(use_global_libvips);target_platform=<(target_platform)'
-    }],
     'include_dirs': [
       '<!(node -p "require(\'node-addon-api\').include_dir")',
     ],
     'conditions': [
       ['use_global_libvips == "true"', {
         # Use pkg-config for include and lib
-        'include_dirs': ['<!@(PKG_CONFIG_PATH="<(pkg_config_path)" pkg-config --cflags-only-I vips-cpp vips glib-2.0)'],
-        #'include_dirs': ['<!@(PKG_CONFIG_PATH="<(pkg_config_path)" pkg-config --cflags-only-I vips-cpp vips glib-2.0 | sed \'s/-I//g\')'],
+        'include_dirs': ['<!@(PKG_CONFIG_PATH="<(pkg_config_path)" pkg-config --cflags-only-I vips-cpp vips glib-2.0 | sed s\/-I//g)'],
         'libraries': ['<!@(PKG_CONFIG_PATH="<(pkg_config_path)" pkg-config --libs vips-cpp)'],
         'defines': [
           'SHARP_USE_GLOBAL_LIBVIPS'
@@ -154,9 +141,17 @@
           '<(sharp_libvips_include_dir)/glib-2.0',
           '<(sharp_libvips_lib_dir)/glib-2.0/include'
         ],
-        'library_dirs': [
-          '<(sharp_libvips_lib_dir)',
-          '/ucrt64/bin'
+        'condiations': [
+             ['target_platform == "msvc"', {
+               'library_dirs': [
+                 '<(sharp_libvips_lib_dir)'
+                 ]
+                 },{
+                 'library_dirs': [
+                 '/ucrt64/bin'
+                 ]
+                 }
+             ]
         ],
         'conditions': [
           ['OS == "win"', {
@@ -165,10 +160,18 @@
               '_FILE_OFFSET_BITS=64'
             ],
             'link_settings': {
-              'libraries': [
-                '-lvips-cpp-42',
-                '-llibvips.lib'
+              'condiations': [
+                ['target_platform == "msvc"', {
+                  'libraries': [
+                'libvips.lib'
               ]
+                },{
+                'libraries': [
+                '-lvips-cpp-42'
+              ]
+                }                
+                ]
+              ]              
             }
           }],
           ['OS == "mac"', {
@@ -294,8 +297,7 @@
         ]
       }
     },
-  },
-  {
+  }, {
     'target_name': 'copy-dll',
     'type': 'none',
     'dependencies': [
