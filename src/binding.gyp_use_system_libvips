@@ -15,7 +15,7 @@
   'targets': [{
     'target_name': 'libvips-cpp-<(vips_version)',
     'conditions': [
-      ['OS == "win"', {
+      ['OS == "win" and target_platform =="msvc"', {
         # Build libvips C++ binding for Windows due to MSVC std library ABI changes
         'type': 'shared_library',
         'defines': [
@@ -41,21 +41,12 @@
           'library_dirs': [
             '<(sharp_libvips_lib_dir)'
           ],
-          'conditions': [
-             ['target_platform == "mingw"', {
-               'libraries': [
-                  '-l:libvips-42.dll'
-               ]}, {
-               'libraries': [
-                  'libvips.lib'
-                ]}
-              ]
-          ]
+          'libraries': [
+            'libvips.lib'
+          ],
         },
         'configurations': {
           'Release': {
-            'conditions': [
-              ['target_platform == "msvc"', {
             'msvs_settings': {
               'VCCLCompilerTool': {
                 "AdditionalOptions": [
@@ -83,8 +74,6 @@
             'msvs_disabled_warnings': [
               4275
             ]
-              }]
-            ]
           }
         }
       }, {
@@ -92,7 +81,8 @@
         'type': 'none'
       }]
     ]
-  }, {
+  },
+  {
     'target_name': 'sharp-<(platform_and_arch)',
     'defines': [
       'G_DISABLE_ASSERT',
@@ -108,7 +98,7 @@
     ],
     'variables': {
       'conditions': [
-        ['OS != "win"', {
+        ['OS != "win" or target_platform =="mingw"', {
           'pkg_config_path': '<!(node -p "require(\'../lib/libvips\').pkgConfigPath()")',
           'use_global_libvips': '<!(node -p "Boolean(require(\'../lib/libvips\').useGlobalLibvips()).toString()")'
         }, {
@@ -118,7 +108,6 @@
       ]
     },
     'sources': [
-      #'<(sharp_libvips_lib_dir)/../../../../src/common.cc',
       'common.cc',
       'metadata.cc',
       'stats.cc',
@@ -132,8 +121,8 @@
     #  'inputs': [],
     #  'outputs': ['<(INTERMEDIATE_DIR)/debug_dummy'],
     #  'action': [
-    #    #'python', '-c', 'import os;print(os.environ.get(\'SHELL\'));print(\'---------------------------\')'
-    #    'node', '-p', 'process.cwd()'
+        #'python', '-c', 'import os;print(os.environ.get(\'SHELL\'));print(\'---------------------------\')'
+    #    'node', '-p', '\'process.cwd()\''
     #  ],
     #  'message': '\'OS = <(OS)\'; \'arch = <(platform_and_arch)\'; \'vips_version = <(vips_version)\';\'sharp_libvips_version = <(sharp_libvips_version)\';\'sharp_libvips_yarn_locator = <(sharp_libvips_yarn_locator)\';\'sharp_libvips_include_dir = <(sharp_libvips_include_dir)\';\'sharp_libvips_lib_dir = <(sharp_libvips_lib_dir)\';\'sharp_libvips_cplusplus_dir = <(sharp_libvips_cplusplus_dir)\';pkg_config_path=<(pkg_config_path);use_global_libvips=<(use_global_libvips);target_platform=<(target_platform)'
     #}],
@@ -143,7 +132,8 @@
     'conditions': [
       ['use_global_libvips == "true"', {
         # Use pkg-config for include and lib
-        'include_dirs': ['<!@(PKG_CONFIG_PATH="<(pkg_config_path)" pkg-config --cflags-only-I vips-cpp vips glib-2.0 | sed s\/-I//g)'],
+        #'include_dirs': ['<!@(PKG_CONFIG_PATH="<(pkg_config_path)" pkg-config --cflags-only-I vips-cpp vips glib-2.0)'],
+        'include_dirs': ['<!@(PKG_CONFIG_PATH="<(pkg_config_path)" pkg-config --cflags-only-I vips-cpp vips glib-2.0 | sed \'s/-I//g\')'],
         'libraries': ['<!@(PKG_CONFIG_PATH="<(pkg_config_path)" pkg-config --libs vips-cpp)'],
         'defines': [
           'SHARP_USE_GLOBAL_LIBVIPS'
@@ -167,7 +157,7 @@
           '<(sharp_libvips_lib_dir)'
         ],
         'conditions': [
-          ['OS == "win" and target_platform =="msvc"', {
+          ['OS == "win"', {
             'defines': [
               '_ALLOW_KEYWORD_MACROS',
               '_FILE_OFFSET_BITS=64'
@@ -198,43 +188,22 @@
               ]
             }
           }],
-          ['OS == "linux" or target_platform == "mingw"', {
+          ['OS == "linux"', {
             'defines': [
               '_GLIBCXX_USE_CXX11_ABI=1'
             ],
-            'conditions': [
-               ['target_platform !="mingw"', {
             'cflags_cc': [
               '<!(node -p "require(\'detect-libc\').isNonGlibcLinuxSync() ? \'\' : \'-flto=auto\'")'
             ],
-               }
-               ]
-            ],
             'link_settings': {
-               'conditions': [
-                 ['target_platform =="mingw"', {
-                   'libraries': [
-                     # '-l:libvips-cpp-<(vips_version)'
-                   ],
-                   'library_dirs': [
-                         'build/Release/obj.target'
-                   ]
-                 },{
-                   'libraries': [
-                     '-l:libvips-cpp.so.<(vips_version)'
-                   ],
-                   'ldflags': [
-                     '-Wl,--disable-new-dtags',
-                     '-Wl,-z,nodelete',
-                   ]
-                 }
-                ]
-               ],
+              'libraries': [
+                '-l:libvips-cpp.so.<(vips_version)'
+              ],
               'ldflags': [
                 '-lstdc++fs',
                 '-Wl,-s',
-                #'-Wl,--disable-new-dtags',
-                #'-Wl,-z,nodelete',
+                '-Wl,--disable-new-dtags',
+                '-Wl,-z,nodelete',
                 '-Wl,-Bsymbolic-functions',
                 '-Wl,-rpath=\'$$ORIGIN/../../sharp-libvips-<(platform_and_arch)/lib\'',
                 '-Wl,-rpath=\'$$ORIGIN/../../../sharp-libvips-<(platform_and_arch)/<(sharp_libvips_version)/lib\'',
@@ -322,14 +291,15 @@
         ]
       }
     },
-  }, {
+  },
+  {
     'target_name': 'copy-dll',
     'type': 'none',
     'dependencies': [
       'sharp-<(platform_and_arch)'
     ],
     'conditions': [
-      ['OS == "win"', {
+      ['OS == "win" and target_platform =="msvc"', {
         'copies': [{
           'destination': 'build/Release',
           'files': [

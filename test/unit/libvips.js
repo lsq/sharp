@@ -133,7 +133,7 @@ describe('libvips binaries', function () {
   describe('Runtime detection', () => {
     it('platform', () => {
       const [platform] = libvips.runtimePlatformArch().split('-');
-      assert.strict(['darwin', 'freebsd', 'linux', 'linuxmusl', 'win32'].includes(platform));
+      assert.strict(['darwin', 'freebsd', 'linux', 'linuxmusl', 'win32', 'win32gnu'].includes(platform));
     });
     it('arch', () => {
       const [, arch] = libvips.runtimePlatformArch().split('-');

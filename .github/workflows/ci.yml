@@ -171,16 +171,134 @@ jobs:
       - uses: actions/checkout@v4
       - run: npm install
       - run: npm run build
+      - if: matrix.package && contains(matrix.os, 'windows')
+        run: Get-ChildItem -path node_modules/@img/sharp-libvips-dev/cplusplus/ -Recurse
       - run: npm run test-unit
+        #continue-on-error: true
       - if: matrix.package
         run: npm run package-from-local-build
       - uses: actions/upload-artifact@v4
         if: matrix.package
         with:
           name: ${{ matrix.platform }}
-          path: npm/${{ matrix.platform }}
+          path: |
+            npm/${{ matrix.platform }}
           retention-days: 1
           if-no-files-found: error
+  build-msys2:
+    permissions:
+     contents: read
+    strategy:
+      matrix:
+        sys: [UCRT64]
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: taiki-e/checkout-action@b13d20b7cda4e2f325ef19895128f7ff735c0b3d # v1.3.1
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.sys }}
+          update: true
+          release: false
+          location: C:\
+          install: >-
+            base-devel binutils
+          pacboy: >-
+            rustup:p
+            nodejs:p
+            yarn:p
+            python3.12:p
+            toolchain:p
+      - name: Install
+        run: |
+          #sed -i '/prefix/d' /c/npm/prefix/etc/npmrc
+          #cat ~/.npmrc
+          pyver=$(python --version | sed -r -n 's/.*(([0-9]{1,2})\.([0-9]{1,2}))\.[0-9]{1,2}.*/\1/p')
+          sed -i 's|^\(import os\)|import platform\n\1|;s|\( *\)\(args = \x27{} \)/c\( "{}"\x27.format (comspec,\)\( args)$\)|\1if \x27cmd.exe\x27 in comspec:\n\1  shellSw = \x27/c\x27\n\1else:\n\1  shellSw = \x27-c\x27\n\1  args = args.replace(\x27"\x27, \x27\x5c\x5c"\x27)\n\1\2{}\3 shellSw,\4|' $MINGW_PREFIX/lib/python${pyver}/subprocess.py
+          echo $npm_config_prefix
+          export npm_config_prefix=$MINGW_PREFIX
+          npm config set prefix $MINGW_PREFIX
+          echo '' > /c/npm/prefix/etc/npmrc
+          npm config ls -l
+          mv /c/npm{,.bak}
+          old=$(pwd)
+          cd /ucrt64/lib/node_modules/npm/node_modules/
+          [ -d ./node-gyp ] && cd ./node-gyp && ls -l
+          cp $old/input.py gyp/pylib/gyp
+          cp $old/make.py gyp/pylib/gyp/generator
+          which npm
+          npm link --force
+          #export MSYS="winsymlinks:lnk"
+          #ln -s /ucrt64/lib/node_modules/npm/node-gyp /ucrt64/lib/node_modules/node-gyp
+          cd /ucrt64/lib/node_modules
+          ls -l
+          cd $old
+          which cargo
+          which node && node -p "process.report.getReport().header.osName"
+          which rustup && rustup default
+          rustup set default-host x86_64-pc-windows-gnu
+          rustup install stable-x86_64-pc-windows-gnu
+          # rustVersion=$(sed -n 's/channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          # rustup install "$rustVersion"
+          rustup default stable-x86_64-pc-windows-gnu
+          rustup override set stable-x86_64-pc-windows-gnu
+          rustup show
+          rustup target add x86_64-pc-windows-gnu
+          which npm && which corepack
+          python ./checkPer.py
+          # corepack enable pnpm
+          # npm install -g pnpm
+          # npm install -g pnpm@latest-10
+          # echo $?
+      - name: Build
+        continue-on-error: true
+        run: |
+          # npm install -g corepack
+          # corepack enable
+          # export JAVA_HOME="/C/Program Files/OpenJDK/jdk-21"
+          # export PATH="$JAVA_HOME/bin:$PATH"
+          # java -version
+          export npm_config_prefix=$MINGW_PREFIX
+          which npm && which python && python --version
+          which node-gyp
+          [ -d /c/hostedtoolcache/windows/Python ] && mv /c/hostedtoolcache/windows/Python{,.bak}
+          # sed -i 's|\(@napi-rs/cli": *\).*,$|\1"https://github.com/lsq/napi-rs/releases/download/%40napi-rs%2Fcli%403.2.0/napi-rs-cli-3.2.0.tgz",|' package.json
+          # sed -i 's|\(@napi-rs/wasm-runtime": *"\).*"|\1https://github.com/lsq/napi-rs/releases/download/%40napi-rs%2Fwasm-runtime%401.0.5/napi-rs-wasm-runtime-1.0.5.tgz"|' package.json
+          sed -i '/node-gyp/d' package.json
+          sed -i 's/install":/built":/' package.json
+          # sed -i '/gyp =/d' install/check.js
+          # sed -i 's/gyp()/d' install/check.js
+          mkdir node_modules
+          npm install
+          npm link node-gyp --force
+          cp -rf node_modules/@img/sharp-libvips-win32{,gnu}-x64
+          ls -l node_modules
+          #cp -rf $MINGW_PREFIX/lib/node_modules/npm/node_modules/node-gyp node_modules/
+          # ls node_modules
+          cd src
+          node -p "require('../lib/libvips').minimumLibvipsVersion"
+          node -p "require('../lib/libvips').buildSharpLibvipsCPlusPlusDir()"
+          cd ..
+          npm run built
+          npm run build
+          ls -R ./src/build/
+          # ls -R npm/
+          # sed -i '/^  describe(\x27Windows platform/,/^  });/{s|^|//|}' test/unit/libvips.js
+          npm run test-unit
+          npm run package-from-local-build
+          ls -R npm/
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: win32gnu-x64
+          path: |
+            npm/win32gnu-x64
+          if-no-files-found: error
+
+
   build-linuxmusl-arm64:
     permissions:
       contents: read
@@ -329,11 +447,24 @@ jobs:
       - build-emscripten
     steps:
       - uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          nver=$(sed -n '4s/.*"version": *"\([^"]*\)".*/\1/p' package.json)
+          echo nver=$nver | tee -a $GITHUB_ENV
+          sed -i 's|\(.*sharp-win32gnu-x64": *"\)[^"]*\(".*\)|\1https://github.com/lsq/sharp/releases/download/%40img%2Fsharp%40'"$nver"'/img-sharp-win32gnu-x64-'"$nver"'.tgz\2|' package.json
       - uses: actions/download-artifact@v4
         with:
           path: npm
       - name: Create npm workspace tarball
-        run: tar -vcaf npm-workspace.tar.xz --directory npm --exclude=from-local-build.js .
+        run: |
+          tar -vcaf npm-workspace.tar.xz --directory npm --exclude=from-local-build.js .
+          echo '----------------------------'
+          cd npm && npm publish --workspaces --dry-run && echo '---------------------------------' && cd -
+          # while read -r pn;do p="${pn%$'\r'}" echo -e "-----------\nPack ${p}";cd npm/"${p}";npm pack; ls; cp -rf *.tgz ../;cd -;done < <(jq -r '.workspaces.[]' npm/package.json)
+          while read -r pn;do p="${pn%$'\r'}"; echo -e "-----------\nPack ${p}";cd npm/"${p}";npm pack; ls; cp -rf *.tgz ../;cd -;done < <(jq -r '.workspaces.[]' npm/package.json)
+          echo '----------------'
+          pwd && ls && echo '---------------' && npm pack && ls
       - uses: actions/setup-node@v5
         with:
           node-version: '24'
@@ -354,3 +485,15 @@ jobs:
       - name: Publish sharp npm package
         if: startsWith(github.ref, 'refs/tags/v')
         run: npm publish --tag=${{ contains(github.ref, '-rc') && 'next' || 'latest' }}
+      - name: Upload to Release (@img/sharp)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sharp-*.tgz
+            npm/*.tgz
+          name: '@img/sharp@${{ env.nver }}'
+          tag_name: '@img/sharp@${{ env.nver }}'
+          fail_on_unmatched_files: true
+          # body_path: gitlog.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
