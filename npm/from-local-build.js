@@ -25,7 +25,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 `;
 
-const platform = buildPlatformArch();
+const arch = ()=>{
+  if (process.report?.getReport?.()?.header?.osName?.startsWith?.('MINGW')) {
+    return '-gnu'
+  } else {
+    return ''
+  }
+}
+const platform = buildPlatformArch() + arch();
 const destDir = join(__dirname, platform);
 console.log(`Populating npm package for platform: ${platform}`);
 
@@ -43,7 +50,7 @@ cpSync(releaseDir, libDir, {
 });
 
 // Generate README
-const { name, description } = require(`./${platform}/package.json`);
+const { name, description } = require(`./${buildPlatformArch()}/package.json`);
 writeFileSync(join(destDir, 'README.md'), `# \`${name}\`\n\n${description}.\n${licensing}`);
 
 // Copy Apache-2.0 LICENSE
@@ -51,7 +58,7 @@ copyFileSync(join(__dirname, '..', 'LICENSE'), join(destDir, 'LICENSE'));
 
 // Copy files for packages without an explicit sharp-libvips dependency (Windows, wasm)
 if (platform.startsWith('win') || platform.startsWith('wasm')) {
-  const libvipsPlatform = platform === 'wasm32' ? 'dev-wasm32' : platform;
+  const libvipsPlatform = platform === 'wasm32' ? 'dev-wasm32' : buildPlatformArch();
   const sharpLibvipsDir = join(require(`@img/sharp-libvips-${libvipsPlatform}/lib`), '..');
   // Copy versions.json
   copyFileSync(join(sharpLibvipsDir, 'versions.json'), join(destDir, 'versions.json'));

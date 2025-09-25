@@ -1,3 +1,5 @@
+[![CI](https://github.com/lsq/sharp/actions/workflows/ci.yml/badge.svg)](https://github.com/lsq/sharp/actions/workflows/ci.yml)
+
 # sharp
 
 <img src="https://sharp.pixelplumbing.com/sharp-logo.svg" width="160" height="160" alt="sharp logo" align="right">

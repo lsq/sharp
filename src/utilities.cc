@@ -252,7 +252,7 @@ Napi::Value _maxColourDistance(const Napi::CallbackInfo& info) {
   return Napi::Number::New(env, maxColourDistance);
 }
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(_WIN32)
 // mallctl will be resolved by the runtime linker when jemalloc is being used
 extern "C" {
   int mallctl(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) __attribute__((weak));

@@ -167,7 +167,8 @@
     "@img/sharp-wasm32": "0.34.4",
     "@img/sharp-win32-arm64": "0.34.4",
     "@img/sharp-win32-ia32": "0.34.4",
-    "@img/sharp-win32-x64": "0.34.4"
+    "@img/sharp-win32-x64": "0.34.4",
+    "@img/sharp-win32-x64-gnu": "0.34.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.6",
