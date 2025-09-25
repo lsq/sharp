@@ -25,7 +25,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 `;
 
-const platform = buildPlatformArch();
+const arch = ()=>{
+  if (process.report?.getReport?.()?.header?.osName?.startsWith?.('MINGW')) {
+    return '-gnu'
+  } else {
+    return ''
+  }
+}
+const platform = buildPlatformArch() + arch();
 const destDir = join(__dirname, platform);
 console.log(`Populating npm package for platform: ${platform}`);
 
